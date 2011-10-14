@@ -1,3 +1,5 @@
+require 'thread'
+
 # Guard is the main module for all Guard related modules and classes.
 # Also other Guard implementation should use this namespace.
 #
@@ -27,6 +29,8 @@ module Guard
     # @option options [Boolean] watch_all_modifications watches all file modifications if true
     #
     def setup(options = {})
+      @lock = Mutex.new
+
       @options    = options
       @guards     = []
       @groups     = [Group.new(:default)]
@@ -123,9 +127,6 @@ module Guard
     def stop
       UI.info 'Bye bye...', :reset => true
 
-      listener.lock
-      interactor.lock
-
       run_guard_task(:stop)
 
       listener.stop
@@ -151,13 +152,13 @@ module Guard
     # Pause Guard listening to file changes.
     #
     def pause
-      if listener.locked
+      if listener.paused?
         UI.info 'Un-paused files modification listening', :reset => true
         listener.clear_changed_files
-        listener.unlock
+        listener.run
       else
         UI.info 'Paused files modification listening', :reset => true
-        listener.lock
+        listener.pause
       end
     end
 
@@ -175,18 +176,17 @@ module Guard
     # @yield the block to run
     #
     def run
-      listener.lock
-      interactor.lock
-
       UI.clear if options[:clear]
 
-      begin
-        yield
-      rescue Interrupt
-      end
+      @lock.synchronize do
+        begin
+          @interactor.stop_if_not_current
+          yield
+        rescue Interrupt
+        end
 
-      interactor.unlock
-      listener.unlock
+        @interactor.start
+      end
     end
 
     # Loop through all groups and run the given task for each Guard.
@@ -245,7 +245,7 @@ module Guard
     # @return [Array<String>] the changed paths
     #
     def changed_paths(paths)
-      paths.select { |f| !f.start_with?('!') }
+      self.options[:any_return] ? paths : paths.select { |f| !f.start_with?('!') }
     end
 
     # Detects the paths that have been deleted.
@@ -257,7 +257,7 @@ module Guard
     # @return [Array<String>] the deleted paths
     #
     def deleted_paths(paths)
-      paths.select { |f| f.start_with?('!') }.map { |f| f.slice(1..-1) }
+      self.options[:any_return] ? paths : paths.select { |f| f.start_with?('!') }.map { |f| f.slice(1..-1) }
     end
 
     # Run a Guard task, but remove the Guard when his work leads to a system failure.
