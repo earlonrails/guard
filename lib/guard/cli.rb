@@ -127,7 +127,7 @@ module Guard
       end
 
       if guard_name
-        guard_class = ::::Guard.get_guard_class(guard_name)
+        guard_class = ::Guard.get_guard_class(guard_name)
         guard_class.init(guard_name)
       end
     end
@@ -135,8 +135,8 @@ module Guard
     desc 'show', 'Show all defined ::Guards and their options'
     map %w(-T) => :show
 
-    # Shows all ::Guards and their options that are defined in
-    # the `::Guardfile`.
+    # Shows all Guards and their options that are defined in
+    # the `Guardfile`.
     #
     # @example guard show output
     #
@@ -146,7 +146,7 @@ module Guard
     #     jasmine
     #     rspec: cli => "--fail-fast --format Fuubar
     #
-    # @see ::Guard::DslDescriber
+    # @see Guard::DslDescriber
     #
     def show
       ::Guard::DslDescriber.evaluate_guardfile(options)
